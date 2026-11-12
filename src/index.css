@@ -17,12 +17,18 @@
   box-shadow: 0 0 30px -5px rgba(77, 142, 255, 0.4);
 }
 
-/* Base glass card without generic CSS hover states (3D tilt handled by Framer Motion) */
+/* Glass card: Heavy backdrop-blur on desktop, light/solid translucent on mobile to avoid GPU frame drops on MediaTek Mali chips */
 .glass-card {
-  background: rgba(23, 31, 51, 0.65);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: rgba(23, 31, 51, 0.94);
   border: 1px solid rgba(140, 144, 159, 0.2);
+}
+
+@media (min-width: 768px) {
+  .glass-card {
+    background: rgba(23, 31, 51, 0.65);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
 }
 
 /* Hide scrollbars on horizontal filter tabs on mobile while keeping scroll functionality */

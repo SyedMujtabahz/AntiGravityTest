@@ -21,7 +21,7 @@ interface MeshEdge {
 }
 
 export const ParticleMeshBackground: React.FC = () => {
-  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
@@ -33,15 +33,21 @@ export const ParticleMeshBackground: React.FC = () => {
   const parallaxY = useTransform(springY, [-0.5, 0.5], [-24, 24]);
 
   useEffect(() => {
-    const checkViewport = () => {
-      setIsMobileViewport(window.innerWidth < 768);
+    // Detect mobile viewport or low-end touch screens (e.g. MediaTek Helio devices)
+    const checkIsMobile = () => {
+      const isNarrow = window.innerWidth < 768;
+      const isTouch = window.matchMedia('(pointer: coarse)').matches;
+      setIsMobile(isNarrow || isTouch);
     };
-    checkViewport();
-    window.addEventListener('resize', checkViewport, { passive: true });
-    return () => window.removeEventListener('resize', checkViewport);
+
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile, { passive: true });
+    return () => window.removeEventListener('resize', checkIsMobile);
   }, []);
 
   useEffect(() => {
+    if (isMobile) return; // Completely skip mouse tracking on mobile
+
     const handleMouseMove = (e: MouseEvent) => {
       const nx = e.clientX / window.innerWidth - 0.5;
       const ny = e.clientY / window.innerHeight - 0.5;
@@ -50,12 +56,14 @@ export const ParticleMeshBackground: React.FC = () => {
     };
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
     return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [mouseX, mouseY]);
+  }, [mouseX, mouseY, isMobile]);
 
+  // Full desktop constellation; on mobile we skip JS-driven SVG matrix animation
   const { nodes, edges } = useMemo(() => {
-    // Full 7x5 constellation on desktop; lighter 5x4 constellation on mobile for smooth 60fps mobile GPU performance
-    const cols = isMobileViewport ? 5 : 7;
-    const rows = isMobileViewport ? 4 : 5;
+    if (isMobile) return { nodes: [], edges: [] };
+
+    const cols = 7;
+    const rows = 5;
     const generatedNodes: ParticleNode[] = [];
 
     let id = 0;
@@ -82,7 +90,7 @@ export const ParticleMeshBackground: React.FC = () => {
     }
 
     const generatedEdges: MeshEdge[] = [];
-    const maxDist = isMobileViewport ? 340 : 290;
+    const maxDist = 290;
     for (let i = 0; i < generatedNodes.length; i++) {
       for (let j = i + 1; j < generatedNodes.length; j++) {
         const a = generatedNodes[i];
@@ -100,13 +108,41 @@ export const ParticleMeshBackground: React.FC = () => {
     }
 
     return { nodes: generatedNodes, edges: generatedEdges };
-  }, [isMobileViewport]);
+  }, [isMobile]);
 
+  // Mobile fallback: Zero-CPU hardware-accelerated CSS cyber grid with subtle glowing ambient lights
+  if (isMobile) {
+    return (
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden bg-background">
+        {/* Hardware-accelerated static ambient glows (no continuous JS repaints) */}
+        <div className="absolute -top-32 -left-20 h-72 w-72 rounded-full bg-primary-container/15 blur-[60px]" />
+        <div className="absolute top-1/3 -right-24 h-80 w-80 rounded-full bg-secondary/15 blur-[70px]" />
+        <div className="absolute bottom-1/4 -left-20 h-72 w-72 rounded-full bg-tertiary-container/10 blur-[60px]" />
+
+        {/* Crisp static cyber grid - 0% CPU usage on low-end Mali/PowerVR GPUs */}
+        <div
+          className="absolute inset-0 opacity-40"
+          style={{
+            backgroundImage: `
+              linear-gradient(to right, rgba(76, 215, 246, 0.08) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(76, 215, 246, 0.08) 1px, transparent 1px)
+            `,
+            backgroundSize: '36px 36px',
+          }}
+        />
+
+        {/* Vignette */}
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_40%,rgba(11,19,38,0.7)_100%)]" />
+      </div>
+    );
+  }
+
+  // Desktop: 100% full fidelity Framer Motion mesh constellation + mouse parallax
   return (
     <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden bg-background">
       {/* Ambient Deep Cybernetic Glows */}
       <motion.div
-        className="absolute -top-40 left-1/4 h-[340px] w-[340px] sm:h-[520px] sm:w-[520px] rounded-full bg-primary-container/10 blur-[110px] sm:blur-[140px]"
+        className="absolute -top-40 left-1/4 h-[520px] w-[520px] rounded-full bg-primary-container/10 blur-[140px]"
         animate={{
           scale: [1, 1.12, 1],
           opacity: [0.55, 0.85, 0.55],
@@ -114,7 +150,7 @@ export const ParticleMeshBackground: React.FC = () => {
         transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
       />
       <motion.div
-        className="absolute top-1/3 -right-32 h-[380px] w-[380px] sm:h-[600px] sm:w-[600px] rounded-full bg-secondary/10 blur-[120px] sm:blur-[160px]"
+        className="absolute top-1/3 -right-32 h-[600px] w-[600px] rounded-full bg-secondary/10 blur-[160px]"
         animate={{
           scale: [1, 1.15, 1],
           opacity: [0.45, 0.75, 0.45],
@@ -127,7 +163,7 @@ export const ParticleMeshBackground: React.FC = () => {
         }}
       />
       <motion.div
-        className="absolute bottom-1/4 -left-32 h-[320px] w-[320px] sm:h-[500px] sm:w-[500px] rounded-full bg-tertiary-container/10 blur-[110px] sm:blur-[140px]"
+        className="absolute bottom-1/4 -left-32 h-[500px] w-[500px] rounded-full bg-tertiary-container/10 blur-[140px]"
         animate={{
           scale: [1, 1.1, 1],
           opacity: [0.4, 0.7, 0.4],
@@ -140,7 +176,7 @@ export const ParticleMeshBackground: React.FC = () => {
         }}
       />
 
-      {/* Subtle Framer Motion Particle Mesh Constellation */}
+      {/* Full Desktop Animated Framer Motion Particle Mesh */}
       <motion.svg
         viewBox="0 0 1440 900"
         preserveAspectRatio="xMidYMid slice"
@@ -168,7 +204,7 @@ export const ParticleMeshBackground: React.FC = () => {
 
         {/* Animated Mesh Connection Lines */}
         {edges.map((edge, idx) => {
-          const baseOpacity = Math.max(0.05, (1 - edge.distance / 340) * 0.24);
+          const baseOpacity = Math.max(0.05, (1 - edge.distance / 290) * 0.24);
           return (
             <motion.line
               key={edge.id}
@@ -264,7 +300,7 @@ export const ParticleMeshBackground: React.FC = () => {
         ))}
       </motion.svg>
 
-      {/* Vignette Edge Darkening for High Contrast */}
+      {/* Vignette Edge Darkening */}
       <div
         className="
           absolute inset-0

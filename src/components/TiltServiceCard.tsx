@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   motion,
   useMotionTemplate,
@@ -16,13 +16,13 @@ interface TiltServiceCardProps {
 export const cardFadeUpVariants: Variants = {
   hidden: {
     opacity: 0,
-    y: 36,
+    y: 28,
   },
   visible: {
     opacity: 1,
     y: 0,
     transition: {
-      duration: 0.55,
+      duration: 0.45,
       ease: [0.22, 1, 0.36, 1],
     },
   },
@@ -31,6 +31,17 @@ export const cardFadeUpVariants: Variants = {
 export const TiltServiceCard: React.FC<TiltServiceCardProps> = ({ service }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    // Only enable 3D tilt tracking and spotlight on fine pointers (desktops with mouse)
+    const checkIsDesktop = () => {
+      setIsDesktop(window.innerWidth >= 768 && window.matchMedia('(pointer: fine)').matches);
+    };
+    checkIsDesktop();
+    window.addEventListener('resize', checkIsDesktop, { passive: true });
+    return () => window.removeEventListener('resize', checkIsDesktop);
+  }, []);
 
   // Normalized cursor coordinates (-0.5 to 0.5)
   const mouseX = useMotionValue(0);
@@ -40,7 +51,7 @@ export const TiltServiceCard: React.FC<TiltServiceCardProps> = ({ service }) => 
   const glareX = useMotionValue(180);
   const glareY = useMotionValue(120);
 
-  // Smooth spring physics for 3D tilt
+  // Smooth spring physics for 3D tilt (desktop only)
   const springConfig = { stiffness: 260, damping: 22, mass: 0.6 };
   const smoothX = useSpring(mouseX, springConfig);
   const smoothY = useSpring(mouseY, springConfig);
@@ -51,7 +62,8 @@ export const TiltServiceCard: React.FC<TiltServiceCardProps> = ({ service }) => 
   const spotlightBackground = useMotionTemplate`radial-gradient(360px circle at ${glareX}px ${glareY}px, rgba(76, 215, 246, 0.16), rgba(77, 142, 255, 0.06) 45%, transparent 80%)`;
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current) return;
+    if (!isDesktop || !cardRef.current) return;
+
     const rect = cardRef.current.getBoundingClientRect();
     const width = rect.width;
     const height = rect.height;
@@ -65,13 +77,15 @@ export const TiltServiceCard: React.FC<TiltServiceCardProps> = ({ service }) => 
   };
 
   const handleMouseEnter = () => {
-    setIsHovered(true);
+    if (isDesktop) setIsHovered(true);
   };
 
   const handleMouseLeave = () => {
-    setIsHovered(false);
-    mouseX.set(0);
-    mouseY.set(0);
+    if (isDesktop) {
+      setIsHovered(false);
+      mouseX.set(0);
+      mouseY.set(0);
+    }
   };
 
   return (
@@ -83,17 +97,17 @@ export const TiltServiceCard: React.FC<TiltServiceCardProps> = ({ service }) => 
       onMouseLeave={handleMouseLeave}
       whileTap={{ scale: 0.985 }}
       style={{
-        rotateX,
-        rotateY,
-        transformStyle: 'preserve-3d',
-        transformPerspective: 1000,
+        rotateX: isDesktop ? rotateX : 0,
+        rotateY: isDesktop ? rotateY : 0,
+        transformStyle: isDesktop ? 'preserve-3d' : 'flat',
+        transformPerspective: isDesktop ? 1000 : undefined,
       }}
       animate={{
-        scale: isHovered ? 1.02 : 1,
-        borderColor: isHovered
+        scale: isHovered && isDesktop ? 1.02 : 1,
+        borderColor: isHovered && isDesktop
           ? 'rgba(76, 215, 246, 0.55)'
           : 'rgba(140, 144, 159, 0.2)',
-        boxShadow: isHovered
+        boxShadow: isHovered && isDesktop
           ? '0 22px 45px -12px rgba(3, 181, 211, 0.28), 0 0 25px -5px rgba(77, 142, 255, 0.2)'
           : '0 4px 20px -4px rgba(0, 0, 0, 0.35)',
       }}
@@ -102,22 +116,24 @@ export const TiltServiceCard: React.FC<TiltServiceCardProps> = ({ service }) => 
         borderColor: { duration: 0.2 },
         boxShadow: { duration: 0.25 },
       }}
-      className="service-item glass-card p-5 sm:p-6 rounded-xl flex flex-col justify-between relative cursor-default will-change-transform"
+      className="service-item glass-card p-5 sm:p-6 rounded-xl flex flex-col justify-between relative cursor-default"
       data-category={service.category}
     >
-      {/* Dynamic 3D Specular Spotlight Glare */}
-      <motion.div
-        className="pointer-events-none absolute inset-0 rounded-xl z-10"
-        style={{
-          background: spotlightBackground,
-          opacity: isHovered ? 1 : 0,
-        }}
-      />
+      {/* Dynamic 3D Specular Spotlight Glare (Desktop only) */}
+      {isDesktop && (
+        <motion.div
+          className="pointer-events-none absolute inset-0 rounded-xl z-10"
+          style={{
+            background: spotlightBackground,
+            opacity: isHovered ? 1 : 0,
+          }}
+        />
+      )}
 
       {/* Top Service Image Header */}
       <div
         className="overflow-hidden rounded-t-xl relative -mt-5 -mx-5 sm:-mt-6 sm:-mx-6 mb-5 sm:mb-6"
-        style={{ transform: 'translateZ(14px)' }}
+        style={{ transform: isDesktop ? 'translateZ(14px)' : undefined }}
       >
         <motion.img
           className="w-full h-40 sm:h-44 object-cover rounded-t-xl border-b border-outline-variant/30"
@@ -125,17 +141,17 @@ export const TiltServiceCard: React.FC<TiltServiceCardProps> = ({ service }) => 
           alt={service.imageAlt}
           loading="lazy"
           decoding="async"
-          animate={{ scale: isHovered ? 1.05 : 1 }}
+          animate={{ scale: isHovered && isDesktop ? 1.05 : 1 }}
           transition={{ duration: 0.4, ease: 'easeOut' }}
         />
       </div>
 
       {/* Card Body */}
-      <div className="relative z-20" style={{ transform: 'translateZ(24px)' }}>
+      <div className="relative z-20" style={{ transform: isDesktop ? 'translateZ(24px)' : undefined }}>
         <div className="flex items-center justify-between mb-4">
           <motion.div
             animate={{
-              borderColor: isHovered
+              borderColor: isHovered && isDesktop
                 ? 'rgba(76, 215, 246, 0.9)'
                 : 'rgba(66, 71, 84, 1)',
             }}
@@ -172,7 +188,7 @@ export const TiltServiceCard: React.FC<TiltServiceCardProps> = ({ service }) => 
       {/* Card Footer */}
       <div
         className="relative z-20 flex items-center justify-between pt-4 border-t border-outline-variant/30"
-        style={{ transform: 'translateZ(20px)' }}
+        style={{ transform: isDesktop ? 'translateZ(20px)' : undefined }}
       >
         <a
           className="font-label-sm text-label-sm text-secondary hover:text-on-surface flex items-center gap-1 py-1"
@@ -180,7 +196,7 @@ export const TiltServiceCard: React.FC<TiltServiceCardProps> = ({ service }) => 
         >
           <span>Book Diagnostic</span>
           <motion.span
-            animate={{ x: isHovered ? 4 : 0 }}
+            animate={{ x: isHovered && isDesktop ? 4 : 0 }}
             transition={{ type: 'spring', stiffness: 350, damping: 20 }}
             className="material-symbols-outlined text-xs"
           >
